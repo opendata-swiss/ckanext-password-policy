@@ -1,62 +1,62 @@
-
 import logging
 
-from builtins import int
-from builtins import dict
-from builtins import str
-from ckan.views.user import RegisterView, EditView, PerformResetView
-import ckan.logic as logic
-import ckan.plugins as plugins
+import ckan.lib.authenticator as authenticator
 import ckan.lib.base as base
-from flask import Blueprint
+import ckan.lib.helpers as h
+import ckan.logic as logic
 import ckan.model as model
 import ckan.plugins.toolkit as tk
-from ckan.common import _, config, g, request
-import ckan.lib.helpers as h
-import ckanext.password_policy.helpers as helper
-from webob import Request
-from webob.exc import HTTPFound, HTTPUnauthorized
+from ckan.common import config, login_user, logout_user
+from ckan.views.user import EditView, PerformResetView, RegisterView
+from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required, login_user, logout_user
 from six import text_type
-from six.moves.urllib.parse import urlencode
-try:
-    from webob.multidict import MultiDict
-except ImportError:
-    from webob.multidict import UnicodeMultiDict as MultiDict
+
+import ckanext.password_policy.helpers as helper
 
 log = logging.getLogger(__name__)
 
 
-custom_user = Blueprint('custom_user', __name__, url_prefix='/user')
+custom_user = Blueprint("custom_user", __name__, url_prefix="/user")
 
 
 def me():
-    return h.redirect_to(
-        config.get('ckan.route_after_login', 'dashboard.index'))
+    return h.redirect_to(config.get("ckan.route_after_login", "dashboard.index"))
 
 
 @logic.schema.validator_args
-def custom_user_schema(unicode_safe, user_both_passwords_entered,
-                       user_passwords_match, user_custom_password_validator):
+def custom_user_schema(
+    unicode_safe,
+    user_both_passwords_entered,
+    user_passwords_match,
+    user_custom_password_validator,
+):
     schema = logic.schema.user_new_form_schema()
 
-    schema['password1'] = [unicode_safe, user_both_passwords_entered,
-                           user_custom_password_validator,
-                           user_passwords_match]
-    schema['password2'] = [text_type]
+    schema["password1"] = [
+        unicode_safe,
+        user_both_passwords_entered,
+        user_custom_password_validator,
+        user_passwords_match,
+    ]
+    schema["password2"] = [text_type]
 
     return schema
 
 
 @logic.schema.validator_args
 def custom_user_edit_form_schema(
-        ignore_missing, unicode_safe, user_custom_password_validator,
-        user_passwords_match):
+    ignore_missing, unicode_safe, user_custom_password_validator, user_passwords_match
+):
     schema = logic.schema.default_user_schema()
 
-    schema['password1'] = [ignore_missing, unicode_safe,
-                           user_custom_password_validator,
-                           user_passwords_match]
-    schema['password2'] = [ignore_missing, unicode_safe]
+    schema["password1"] = [
+        ignore_missing,
+        unicode_safe,
+        user_custom_password_validator,
+        user_passwords_match,
+    ]
+    schema["password2"] = [ignore_missing, unicode_safe]
 
     return schema
 
@@ -64,288 +64,123 @@ def custom_user_edit_form_schema(
 class RegisterView_(RegisterView):
     def _prepare(self):
         context = {
-            'model': model,
-            'session': model.Session,
-            'user': g.user,
-            'auth_user_obj': g.userobj,
-            'schema': custom_user_schema(),
-            'save': 'save' in request.form
+            "model": model,
+            "session": model.Session,
+            "user": current_user.name if current_user.is_authenticated else None,
+            "auth_user_obj": getattr(current_user, "user", None),
+            "schema": custom_user_schema(),
+            "save": "save" in request.form,
         }
         try:
-            logic.check_access('user_create', context)
+            logic.check_access("user_create", context)
         except logic.NotAuthorized:
-            tk.base.abort(403, tk._('Unauthorized to register as a user.'))
+            tk.base.abort(403, tk._("Unauthorized to register as a user."))
         return context
 
 
 class EditView_(EditView):
-
     def _prepare(self, id):
         context = {
-            'save': 'save' in request.form,
-            'schema': custom_user_edit_form_schema(),
-            'model': model,
-            'session': model.Session,
-            'user': g.user,
-            'auth_user_obj': g.userobj
+            "save": "save" in request.form,
+            "schema": custom_user_edit_form_schema(),
+            "model": model,
+            "session": model.Session,
+            "user": current_user.name if current_user.is_authenticated else None,
+            "auth_user_obj": getattr(current_user, "user", None),
         }
-        if id is None:
-            if g.userobj:
-                id = g.userobj.id
+        if not id:
+            if current_user.is_authenticated:
+                id = current_user.id
             else:
-                base.abort(400, _('No user specified'))
-        data_dict = {'id': id}
-
+                base.abort(400, tk._("No user specified"))
+        data_dict = {"id": id}
         try:
-            logic.check_access('user_update', context, data_dict)
+            logic.check_access("user_update", context, data_dict)
         except logic.NotAuthorized:
-            base.abort(403, _('Unauthorized to edit a user.'))
+            base.abort(403, tk._("Unauthorized to edit a user."))
         return context, id
 
 
 class PerformResetView_(PerformResetView):
-
     def _get_form_password(self):
-        password1 = request.form.get('password1')
-        password2 = request.form.get('password2')
+        password1 = request.form.get("password1")
+        password2 = request.form.get("password2")
 
         if not password1 or not password2:
-            msg = _('You must provide a password')
+            msg = tk._("You must provide a password")
             raise ValueError(msg)
 
         password_length = helper.get_password_length()
 
         valid_pass = helper.custom_password_check(password1)
-        if not valid_pass['password_ok']:
+        if not valid_pass["password_ok"]:
             raise ValueError(helper.requirements_message(password_length))
         elif password1 != password2:
-            raise ValueError(
-                _('The passwords you entered'
-                    ' do not match.'))
+            raise ValueError(tk._("The passwords you entered" " do not match."))
         return password1
 
 
-class FriendlyFormPlugin_(FriendlyFormPlugin):
+@custom_user.route("/login", methods=["GET", "POST"])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard.datasets"))
 
-    def identify(self, environ):
-        '''
-        Override the parent's identifier to introduce a login counter
-        (possibly along with a post-login page) and load the login counter into
-        the ``environ``.
+    if request.method == "POST":
 
-        '''
-        allowed_failed_logins = int(
-            config.get('ckanext.password_policy.failed_logins', 3))
-        request = Request(environ, charset=self.charset)
+        username = request.form.get("login")
+        password = request.form.get("password")
 
-        path_info = environ['PATH_INFO']
-        script_name = environ.get('SCRIPT_NAME') or '/'
-        query = request.GET
-        if path_info == self.login_handler_path:
-            # We are on the URL where repoze.who processes authentication. #
-            # Let's append the login counter to the query string of the
-            # 'came_from' URL. It will be used by the challenge below if
-            # authorization is denied for this request.
-            form = dict(request.POST)
-            form.update(query)
-            try:
-                login = form['login']
-                password = form['password']
-            except KeyError:
-                credentials = None
-            else:
-                if request.charset == 'us-ascii':
-                    credentials = {
-                        'login': str(login),
-                        'password': str(password),
-                    }
-                else:
-                    credentials = {'login': login, 'password': password}
+        if helper.user_locked_out(username):
+            flash(helper.lockout_message(), "error")
+            return redirect(url_for("custom_user.locked"))
 
-            try:
-                credentials['max_age'] = form['remember']
-            except KeyError:
-                pass
+        identity = {"login": username, "password": password}
 
-            log.info(
-                "User {} is logging in. They have {} previous failed logins "
-                "recorded.".format(
-                    login,
-                    helper.get_user_login_count(login)
-                )
-            )
+        user_obj = authenticator.ckan_authenticator(identity)
 
-            new_user_login_count = helper.increment_user_login_count(login)
+        if user_obj:
+            login_user(user_obj)
+            helper.clear_login_count(username)
+            return redirect(request.args.get("next") or url_for("dashboard.datasets"))
+        else:
+            helper.increment_user_login_count(username)
+            flash(tk._("Login failed. Bad username or password."), "error")
 
-            if new_user_login_count < allowed_failed_logins:
-                # The user has tried to log in with the wrong password fewer
-                # times than the limit we set
-                referer = environ.get('HTTP_REFERER', script_name)
-                destination = form.get('came_from', referer)
+            if helper.user_locked_out(username):
+                return redirect(url_for("custom_user.locked"))
 
-                if self.post_login_url:
-                    # There's a post-login page, so we have to replace the
-                    # destination with it.
-                    destination = self._get_full_path(self.post_login_url,
-                                                    environ)
-                    if 'came_from' in query:
-                        # There's a referrer URL defined, so we have to pass it to
-                        # the post-login page as a GET variable.
-                        destination = self._insert_qs_variable(destination,
-                                                            'came_from',
-                                                            query['came_from'])
-                failed_logins = self._get_logins(environ, True)
-                new_dest = self._set_logins_in_url(destination, failed_logins)
-
-                environ['repoze.who.application'] = HTTPFound(location=new_dest)
-                return credentials
-            elif new_user_login_count == allowed_failed_logins:
-                # The user has already tried to log in with the wrong password
-                # as many times as the set limit. Now they're doing it again.
-                # We lock them out.
-                new_dest = 'user/locked'
-                environ['repoze.who.application'] = HTTPFound(location=new_dest)
-                extra_vars = {}
-
-                log.info(
-                    "User {} just tried to log in with the wrong password. "
-                    "They now have {} failed logins recorded and are locked "
-                    "out.".format(
-                        login,
-                        helper.get_user_login_count(login)
-                    )
-                )
-                return extra_vars
-            else:
-                # The user is already locked out. It doesn't matter if they're
-                # using the right password or not.
-                new_dest = 'user/locked'
-                environ['repoze.who.application'] = HTTPFound(location=new_dest)
-                extra_vars = {}
-
-                log.info(
-                    "User {} just tried to log in, but they are locked out. "
-                    "They now have {} failed logins recorded.".format(
-                        login,
-                        helper.get_user_login_count(login)
-                    )
-                )
-                return extra_vars
-
-        elif path_info == self.logout_handler_path:
-            #    We are on the URL where repoze.who logs the user out.    #
-            r = Request(environ)
-            params = dict(list(r.GET.items()) + list(r.POST.items()))
-            form = MultiDict(params)
-            form.update(query)
-            referer = environ.get('HTTP_REFERER', script_name)
-            came_from = form.get('came_from', referer)
-            # set in environ for self.challenge() to find later
-            environ['came_from'] = came_from
-            environ['repoze.who.application'] = HTTPUnauthorized()
-            return None
-
-        elif path_info == self.login_form_url or self._get_logins(environ):
-            #  We are on the URL that displays the from OR any other page  #
-            #   where the login counter is included in the query string.   #
-            # So let's load the counter into the environ and then hide it from
-            # the query string (it will cause problems in frameworks like TG2,
-            # where this unexpected variable would be passed to the controller)
-            environ['repoze.who.logins'] = self._get_logins(environ, True)
-            # Hiding the GET variable in the environ:
-            if self.login_counter_name in query:
-                del query[self.login_counter_name]
-                environ['QUERY_STRING'] = urlencode(query, doseq=True)
+    return render_template("user/login.html")
 
 
-def _get_repoze_handler(handler_name):
-    '''Returns the URL that repoze.who will respond to and perform a
-    login or logout.'''
-    return getattr(request.environ['repoze.who.plugins']['friendlyform'],
-                   handler_name)
-
-
-def custom_login():
-    # Do any plugin login stuff
-    for item in plugins.PluginImplementations(plugins.IAuthenticator):
-        response = item.login()
-        if response:
-            return response
-
-    extra_vars = {}
-    if g.user:
-        return base.render('user/logout_first.html', extra_vars)
-
-    came_from = request.params.get('came_from')
-    if not came_from:
-        came_from = h.url_for('user.logged_in')
-    g.login_handler = h.url_for(
-        _get_repoze_handler('login_handler_path'), came_from=came_from)
-    return base.render('user/login.html', extra_vars)
-
-
-def logged_in():
-    # redirect if needed
-    came_from = request.params.get('came_from', '')
-    if h.url_is_local(came_from):
-        return h.redirect_to(str(came_from))
-    if g.user:
-        return me()
-    else:
-        log.info('Login failed. Bad username or password.')
-        err = _('Login failed. Bad username or password.')
-        h.flash_error(err)
-        return custom_login()
-
-
-def locked_user():
-
+@custom_user.route("/locked")
+def locked():
     alert = helper.lockout_message()
+    return render_template("user/locked.html", alert=alert)
 
 
-    extra_vars = {}
-    extra_vars['alert'] = alert
-    return base.render('user/locked.html', extra_vars)
-
-
+@custom_user.route("/logout")
+@login_required
 def logout():
-    for item in plugins.PluginImplementations(plugins.IAuthenticator):
-        if g.user:
-            helper.clear_login_count(g.user)
-        response = item.logout()
-        if response:
-            return response
-
-    url = h.url_for('user.logged_out_page')
-    return h.redirect_to(
-        _get_repoze_handler('logout_handler_path') + '?came_from=' + url,
-        parse_url=True)
+    helper.clear_login_count(current_user.name)
+    logout_user()
+    return redirect(url_for("custom_user.login"))
 
 
+@custom_user.route("/reset_login/<username>", methods=["POST"])
 def reset_login(username):
     log.info("Re-enabling login for user {}".format(username))
     helper.clear_login_count(username)
+    flash(tk._("User login re-enabled"), "success")
+    return redirect(url_for("user.read", id=username))
 
-    h.flash_success(_('User login re-enabled'))
-    return h.redirect_to('user.read', id=username)
 
-
+custom_user.add_url_rule("/register", view_func=RegisterView_.as_view("register"))
+_edit_view = EditView_.as_view("edit")
+custom_user.add_url_rule("/edit", view_func=_edit_view)
+custom_user.add_url_rule("/edit/<id>", view_func=_edit_view)
 custom_user.add_url_rule(
-    '/register', view_func=RegisterView_.as_view('register'))
-
-_edit_view = EditView_.as_view('edit')
-custom_user.add_url_rule('/edit', view_func=_edit_view)
-custom_user.add_url_rule('/edit/<id>', view_func=_edit_view)
-
-custom_user.add_url_rule(
-    '/reset/<id>', view_func=PerformResetView_.as_view('perform_reset'))
-
-custom_user.add_url_rule("/login", view_func=custom_login, methods=("GET", "POST"))
-custom_user.add_url_rule('/logged_in', view_func=logged_in, methods=("GET", "POST"))
-
-custom_user.add_url_rule('/locked', view_func=locked_user, methods=("GET", "POST"))
-custom_user.add_url_rule('/_logout', view_func=logout)
-custom_user.add_url_rule('/reset_login/<username>', view_func=reset_login, methods=("POST",))
+    "/reset/<id>", view_func=PerformResetView_.as_view("perform_reset")
+)
 
 
 def get_blueprints():
