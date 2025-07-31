@@ -1,6 +1,12 @@
 {% ckan_extends %}
 
 {% block user_info %}
+  {% if h.user_locked_out(user.name) %}
+    {% set failed_logins = h.get_user_login_count(user.name) %}
+    {% set login_status = 'locked out (' ~ failed_logins ~ ' failed logins)' %}
+  {% else %}
+    {% set login_status = 'login enabled' %}
+  {% endif %}
 <div class="info">
   <dl>
     {% if user.name.startswith('http://') or user.name.startswith('https://') %}
@@ -29,7 +35,7 @@
   {% endif %}
   <dl>
     <dt>{{ _('State') }}</dt>
-    <dd>{{ _(user.state) }}</dd>
+    <dd>{{ _(user.state) }}, {{ _(login_status) }}</dd>
   </dl>
 </div>
 {% endblock %}
