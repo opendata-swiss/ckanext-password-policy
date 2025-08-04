@@ -1,0 +1,41 @@
+{% ckan_extends %}
+
+{% block user_info %}
+  {% if h.user_locked_out(user.name) %}
+    {% set failed_logins = h.get_user_login_count(user.name) %}
+    {% set login_status = 'locked out (' ~ failed_logins ~ ' failed logins)' %}
+  {% else %}
+    {% set login_status = 'login enabled' %}
+  {% endif %}
+<div class="info">
+  <dl>
+    {% if user.name.startswith('http://') or user.name.startswith('https://') %}
+      <dt>{{ _('Open ID') }}</dt>
+      <dd>{{ user.name|urlize(25) }}{# Be great if this just showed the domain #}</dd>
+    {% else %}
+      <dt>{{ _('Username') }}</dt>
+      <dd>{{ user.name }}</dd>
+    {% endif %}
+  </dl>
+  {% if is_myself %}
+    <dl>
+      <dt>{{ _('Email') }} <span class="badge bg-secondary" aria-label="{{ _('This information is visible to you and admins') }}" data-bs-title="{{ _('This information is visible to you and admins') }}" data-bs-toggle="tooltip">{{ _('Private') }}</span></dt>
+      <dd>{{ user.email }}</dd>
+    </dl>
+  {% endif %}
+  <dl>
+    <dt>{{ _('Member Since') }}</dt>
+    <dd>{{ h.render_datetime(user.created) }}</dd>
+  </dl>
+  {% if is_sysadmin %}
+  <dl>
+    <dt>{{_('Last Active') }}</dt>
+    <dd>{{ h.time_ago_from_timestamp(user.last_active) }}</dd>
+  </dl>
+  {% endif %}
+  <dl>
+    <dt>{{ _('State') }}</dt>
+    <dd>{{ _(user.state) }}, {{ _(login_status) }}</dd>
+  </dl>
+</div>
+{% endblock %}
