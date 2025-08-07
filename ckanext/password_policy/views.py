@@ -10,7 +10,6 @@ from ckan.common import config, login_user, logout_user
 from ckan.views.user import EditView, PerformResetView, RegisterView
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
-from six import text_type
 
 import ckanext.password_policy.helpers as helper
 
@@ -39,7 +38,7 @@ def custom_user_schema(
         user_custom_password_validator,
         user_passwords_match,
     ]
-    schema["password2"] = [text_type]
+    schema["password2"] = [unicode_safe]
 
     return schema
 

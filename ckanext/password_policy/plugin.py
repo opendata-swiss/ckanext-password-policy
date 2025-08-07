@@ -3,7 +3,6 @@ import ckan.plugins as plugins
 import ckan.plugins.toolkit as tk
 from ckan.model import User as CKANModelUser
 from flask_login import LoginManager, UserMixin
-from six import string_types
 
 import ckanext.password_policy.helpers as h
 import ckanext.password_policy.views as views
@@ -22,7 +21,7 @@ def user_custom_password_validator(key, data, errors, context):
 
     if isinstance(value, Missing):
         pass
-    elif not isinstance(value, string_types):
+    elif not isinstance(value, str):
         errors[("password",)].append(tk._("Passwords must be strings"))
     elif value == "":
         pass
