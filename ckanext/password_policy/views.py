@@ -117,7 +117,7 @@ class PerformResetView_(PerformResetView):
         if not valid_pass["password_ok"]:
             raise ValueError(helper.requirements_message(password_length))
         elif password1 != password2:
-            raise ValueError(tk._("The passwords you entered" " do not match."))
+            raise ValueError(tk._("The passwords you entered do not match."))
         return password1
 
 
