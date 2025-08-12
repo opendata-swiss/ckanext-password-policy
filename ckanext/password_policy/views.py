@@ -47,7 +47,7 @@ def custom_user_schema(
 def custom_user_edit_form_schema(
     ignore_missing, unicode_safe, user_custom_password_validator, user_passwords_match
 ):
-    schema = logic.schema.default_user_schema()
+    schema = logic.schema.user_edit_form_schema()
 
     schema["password1"] = [
         ignore_missing,
@@ -65,8 +65,8 @@ class RegisterView_(RegisterView):
         context = {
             "model": model,
             "session": model.Session,
-            "user": current_user.name if current_user.is_authenticated else None,
-            "auth_user_obj": getattr(current_user, "user", None),
+            "user": current_user.name,
+            "auth_user_obj": current_user,
             "schema": custom_user_schema(),
             "save": "save" in request.form,
         }
@@ -84,15 +84,17 @@ class EditView_(EditView):
             "schema": custom_user_edit_form_schema(),
             "model": model,
             "session": model.Session,
-            "user": current_user.name if current_user.is_authenticated else None,
-            "auth_user_obj": getattr(current_user, "user", None),
+            "user": current_user.name,
+            "auth_user_obj": current_user,
         }
-        if not id:
+        if id is None:
             if current_user.is_authenticated:
                 id = current_user.id
             else:
                 base.abort(400, tk._("No user specified"))
+        assert id
         data_dict = {"id": id}
+
         try:
             logic.check_access("user_update", context, data_dict)
         except logic.NotAuthorized:
@@ -115,7 +117,7 @@ class PerformResetView_(PerformResetView):
         if not valid_pass["password_ok"]:
             raise ValueError(helper.requirements_message(password_length))
         elif password1 != password2:
-            raise ValueError(tk._("The passwords you entered" " do not match."))
+            raise ValueError(tk._("The passwords you entered do not match."))
         return password1
 
 
