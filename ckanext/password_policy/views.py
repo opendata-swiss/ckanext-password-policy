@@ -65,8 +65,8 @@ class RegisterView_(RegisterView):
         context = {
             "model": model,
             "session": model.Session,
-            "user": current_user.name if current_user.is_authenticated else None,
-            "auth_user_obj": getattr(current_user, "user", None),
+            "user": current_user.name,
+            "auth_user_obj": current_user,
             "schema": custom_user_schema(),
             "save": "save" in request.form,
         }
@@ -84,15 +84,17 @@ class EditView_(EditView):
             "schema": custom_user_edit_form_schema(),
             "model": model,
             "session": model.Session,
-            "user": current_user.name if current_user.is_authenticated else None,
-            "auth_user_obj": getattr(current_user, "user", None),
+            "user": current_user.name,
+            "auth_user_obj": current_user,
         }
-        if not id:
+        if id is None:
             if current_user.is_authenticated:
                 id = current_user.id
             else:
                 base.abort(400, tk._("No user specified"))
+        assert id
         data_dict = {"id": id}
+
         try:
             logic.check_access("user_update", context, data_dict)
         except logic.NotAuthorized:
