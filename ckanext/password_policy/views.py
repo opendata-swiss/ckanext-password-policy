@@ -47,7 +47,7 @@ def custom_user_schema(
 def custom_user_edit_form_schema(
     ignore_missing, unicode_safe, user_custom_password_validator, user_passwords_match
 ):
-    schema = logic.schema.default_user_schema()
+    schema = logic.schema.user_edit_form_schema()
 
     schema["password1"] = [
         ignore_missing,
