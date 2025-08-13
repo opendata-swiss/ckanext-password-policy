@@ -1,8 +1,6 @@
 import ckan.lib.navl.dictization_functions as df
 import ckan.plugins as plugins
 import ckan.plugins.toolkit as tk
-from ckan.model import User as CKANModelUser
-from flask_login import LoginManager, UserMixin
 
 import ckanext.password_policy.helpers as h
 import ckanext.password_policy.views as views
@@ -29,15 +27,6 @@ def user_custom_password_validator(key, data, errors, context):
         errors[("password",)].append(h.requirements_message(password_length))
 
 
-# Wrapper class for flask-login
-class CKANUser(UserMixin):
-    def __init__(self, user: CKANModelUser):
-        self.id = str(user.id)
-        self.name = user.name
-        self.email = user.email
-        self.sysadmin = user.sysadmin
-
-
 class PasswordPolicyPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IConfigurer)
     plugins.implements(plugins.IValidators)
@@ -52,20 +41,6 @@ class PasswordPolicyPlugin(plugins.SingletonPlugin):
         tk.add_template_directory(config_, "templates")
         tk.add_public_directory(config_, "public")
         tk.add_resource("assets", "password_policy")
-
-        # Initialize Flask-Login
-        login_manager = LoginManager()
-        app = config_.get("app") or tk.config.get("flask_app")
-        if app:
-            login_manager.init_app(app)
-            login_manager.login_view = "password_policy.login"
-
-            @login_manager.user_loader
-            def load_user(user_id):
-                user = CKANModelUser.get(user_id)
-                if user:
-                    return CKANUser(user)
-                return None
 
     def get_validators(self):
         return {"user_custom_password_validator": user_custom_password_validator}
