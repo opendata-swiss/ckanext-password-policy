@@ -5,19 +5,17 @@ and password complexity (password must consist capital and small letters, number
 contain the user's name or username). A user lock on defined time period after x number of failed logins is also
 implemented.
 
-This extension is compatible with CKAN 2.8 and 2.9.
+This extension is compatible with CKAN 2.11+.
 
 
 ## Requirements
 
 Compatibility with core CKAN versions:
 
-| CKAN version    | Compatible? |
-| --------------- |-------------|
-| 2.6 and earlier | not tested  |
-| 2.7             | not tested  |
-| 2.8             | Yes         |
-| 2.9             | Yes         |
+| CKAN version | Compatible? |
+|--------------|-------------|
+| 2.10         | not tested  |
+| 2.11         | not tested  |
 
 
 
@@ -32,10 +30,9 @@ To install ckanext-password-policy:
 2. Clone the source and install it on the virtualenv
 
    ``` 
-    git clone https://github.com/Keitaro/ckanext-password-policy.git
+    git clone https://github.com/opendata-swiss/ckanext-password-policy.git
     cd ckanext-password-policy
     pip install -e .
-    pip install -r requirements.txt
    ``` 
 
 3. Add `password_policy` to the `ckan.plugins` setting in your CKAN
@@ -56,10 +53,9 @@ See `ckanext/password_policy/config_declaration.yaml`.
 To install ckanext-password-policy for development, activate your CKAN virtualenv and
 do:
 
-    git clone https://github.com/Keitaro/ckanext-password-policy.git
+    git clone https://github.com/opendata-swiss/ckanext-password-policy.git
     cd ckanext-password-policy
-    python setup.py develop
-    pip install -r dev-requirements.txt
+    pip install -e .[dev]
 
 
 ## Tests
