@@ -1,6 +1,3 @@
-# encoding: utf-8
-
-
 class LoginTestCase:
     def test_login_success(self, app):
 

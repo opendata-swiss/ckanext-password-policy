@@ -1,0 +1,44 @@
+[project]
+name = "ckanext-password-policy"
+version = "0.0.1"
+dynamic = ["optional-dependencies"]
+description = "Custom password policy in CKAN"
+authors = [
+    {name = "Blagoja Bozhinovski", email = "blagoja.bozinovski@keitaro.com"}
+]
+maintainers = [
+    {name = "Liip AG", email = "ogdch@liip.ch"}
+]
+license = {text = "AGPL"}
+classifiers = [
+    "Intended Audience :: Developers",
+    "Development Status :: 5 - Production/Stable",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+]
+keywords = [
+    "CKAN",
+    "password",
+    "policy",
+]
+
+[project.urls]
+Documentation = "https://github.com/opendata-swiss/ckanext-password-policy"
+Repository = "https://github.com/opendata-swiss/ckanext-password-policy"
+Issues = "https://github.com/opendata-swiss/ckanext-password-policy/issues"
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+optional-dependencies = {dev = { file = ["dev-requirements.txt"] }}
+
+[tool.isort]
+profile = "black"
+
+[project.entry-points."ckan.plugins"]
+password_policy = "ckanext.password_policy.plugin:PasswordPolicyPlugin"
