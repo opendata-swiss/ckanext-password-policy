@@ -1,0 +1,30 @@
+version: 1
+
+groups:
+  - annotation: PasswordPolicyPlugin settings
+    options:
+      - key: ckanext.password_policy.password_length
+        default: 10
+        description: Minimum length of password for a non-sysadmin user
+        type: int
+        required: false
+      - key: ckanext.password_policy.password_length_sysadmin
+        default: 18
+        description: Minimum length of password for a sysadmin user
+        type: int
+        required: false
+      - key: ckanext.password_policy.failed_logins
+        default: 3
+        description: Number of failed logins before the user is locked out
+        type: int
+        required: false
+      - key: ckanext.password_policy.user_locked_time
+        default: 600
+        description: Time after the locked user is allowed to log in again in seconds
+        type: int
+        required: false
+      - key: ckanext.password_policy.require_sysadmin_unlock
+        default: false
+        description: Whether a sysadmin must re-enable the locked user to login, instead of just waiting
+        type: bool
+        required: false
